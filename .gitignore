@@ -1,0 +1,36 @@
+# Environment variables
+.env
+.env.local
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data files (optional - uncomment if you don't want to commit scraped data)
+# data/raw/
+# data/processed/
+# data/index/
+
+# Database (optional - uncomment if you don't want to commit chat history)
+# db/
+
