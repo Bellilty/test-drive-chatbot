@@ -1,6 +1,6 @@
 # Architecture & Design Walkthrough (test-drive-chatbot)
 
-This document explains the system end-to-end so you can confidently defend design choices in an interview. The project is a local-first RAG chatbot over 10 Hebrew car-review articles from auto.co.il, with conversation memory per session.
+
 
 ## High-level architecture
 - **Data source**: 10 fixed article URLs (see `src/urls.py`).
@@ -12,6 +12,101 @@ This document explains the system end-to-end so you can confidently defend desig
 - **Orchestrator**: builds prompt with context + history; calls OpenAI `gpt-4o-mini`; stores turns in SQLite `db/chat_history.db`.
 - **UI**: Streamlit chat UI with RTL styling for Hebrew, session picker, new conversation, delete-all, and source display.
 - **Config**: `src/config.py` centralizes paths, chunking params, top-k, models, DB path.
+
+                          ┌───────────────────────────┐
+                          │  1. Article URLs (10x)     │
+                          │  src/urls.py               │
+                          └─────────────┬─────────────┘
+                                        │
+                                        ▼
+                      ┌─────────────────────────────────────┐
+                      │ 2. Scraping Layer                    │
+                      │  fetch_articles.py                   │
+                      │  - requests HTML                     │
+                      │  - BeautifulSoup extraction          │
+                      │  - title + paragraphs                │
+                      └─────────────┬───────────────────────┘
+                                    │
+                                    ▼
+                   ┌────────────────────────────────────────────┐
+                   │ 3. Raw Data Storage                        │
+                   │  data/raw/*.html + *.txt                   │
+                   └───────────────────┬────────────────────────┘
+                                       │
+                                       ▼
+               ┌─────────────────────────────────────────────────────────┐
+               │ 4. Corpus Builder                                       │
+               │  build_corpus.py                                        │
+               │  - paragraph splitting                                  │
+               │  - smart chunking (sub-split long, merge short)         │
+               │  - metadata: {url, title, car_model, chunk_id, text}    │
+               └───────────────────────────┬─────────────────────────────┘
+                                           │
+                                           ▼
+                     ┌──────────────────────────────────────────┐
+                     │ 5. Processed Chunks                      │
+                     │  data/processed/chunks.json              │
+                     └─────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+                ┌──────────────────────────────────────────────────┐
+                │ 6. Embeddings                                    │
+                │  embeddings.py                                   │
+                │  Model: intfloat/multilingual-e5-large           │
+                │  - embed chunk_texts                             │
+                │  - normalize vectors                             │
+                └────────────────┬─────────────────────────────────┘
+                                 │
+                                 ▼
+           ┌────────────────────────────────────────────────────────────────┐
+           │ 7. Vector Store (FAISS)                                         │
+           │  vector_store.py + metadata.json                                │
+           │  - IndexFlatL2 (local)                                          │
+           │  - store embeddings                                             │
+           │  - store metadata (chunk_id → url/title/car model/text)         │
+           └──────────────────────┬─────────────────────────────────────────┘
+                                  │
+                                  ▼
+       ┌──────────────────────────────────────────────────────────────────────┐
+       │ 8. Retriever                                                         │
+       │  retriever.py                                                        │
+       │  - detect car model mentioned in query (optional filter)             │
+       │  - embed user query                                                  │
+       │  - FAISS similarity search top_k                                     │
+       │  - return ranked chunks + distances + metadata                       │
+       └───────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+             ┌──────────────────────────────────────────────────────────────┐
+             │ 9. Chat Orchestrator                                         │
+             │  chat_orchestrator.py                                        │
+             │  - load recent chat history (SQLite)                         │
+             │  - assemble SYSTEM + CONTEXT + HISTORY + USER messages       │
+             │  - context = top retrieved chunks                            │
+             │  - call OpenAI mini-4o                                       │
+             │  - store new turn in chat_history.db                         │
+             └───────────────────────────┬──────────────────────────────────┘
+                                         │
+                                         ▼
+                ┌────────────────────────────────────────────────────────┐
+                │ 10. Chat History Store                                 │
+                │  SQLite: db/chat_history.db                            │
+                │  - session-based conversation memory                   │
+                │  - list sessions / create / append / load history      │
+                └────────────────────────┬────────────────────────────────┘
+                                         │
+                                         ▼
+                      ┌──────────────────────────────────────────────┐
+                      │ 11. Streamlit UI                             │
+                      │  ui/streamlit_app.py                         │
+                      │  - Hebrew RTL interface                      │
+                      │  - conversation selector                     │
+                      │  - new conversation                          │
+                      │  - delete all history                        │
+                      │  - display sources per answer                │
+                      └──────────────────────────────────────────────┘
+
+
 
 ## Why these choices
 - **Local-first vector store**: FAISS is lightweight, fast, and avoids managed services; good for offline/edge or interview constraints. Pinecone was not used to keep dependencies minimal and avoid external service setup.
@@ -113,7 +208,7 @@ streamlit run src/ui/streamlit_app.py
 ```
 First run downloads the embedding model (~2GB).
 
-## Potential interview talking points
+## Reasons behind choices
 - **Why FAISS over Pinecone**: Local, zero external deps, predictable latency, fits offline/demo constraints. Pinecone is great for managed scale, but here simplicity and local-first were requirements.
 - **Why multilingual-e5-large**: Strong multilingual retrieval (Hebrew), good community benchmarks, easy to fine-tune/replace.
 - **Chunking heuristics**: Paragraph-first to respect semantic boundaries; sub-chunk long paragraphs to avoid context dilution; skip/merge tiny ones to reduce noise.
@@ -129,5 +224,8 @@ First run downloads the embedding model (~2GB).
 - Add evals: synthetic Q/A generation and retrieval accuracy checks.
 - Add auth and per-user namespacing for sessions in SQLite/Postgres.
 - Add caching for embeddings and OpenAI responses if cost/latency matters.
+
+## For the detailed system architecture, see Architecture.md.
+
 
 
