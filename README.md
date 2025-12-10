@@ -57,3 +57,4 @@ streamlit run src/ui/streamlit_app.py
 - If the UI says `OPENAI_API_KEY not set`, ensure `.env` at repo root contains `OPENAI_API_KEY=...` and rerun.  
 - First run will download the embedding model (~2GB). Allow a few minutes.  
 
+## For the detailed system architecture, see Architecture.md.

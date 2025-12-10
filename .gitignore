@@ -26,11 +26,11 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Data files (optional - uncomment if you don't want to commit scraped data)
+# Data files 
 # data/raw/
 # data/processed/
 # data/index/
 
-# Database (optional - uncomment if you don't want to commit chat history)
+# Database 
 # db/
 

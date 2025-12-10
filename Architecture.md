@@ -225,7 +225,7 @@ First run downloads the embedding model (~2GB).
 - Add auth and per-user namespacing for sessions in SQLite/Postgres.
 - Add caching for embeddings and OpenAI responses if cost/latency matters.
 
-## For the detailed system architecture, see Architecture.md.
+
 
 
 
